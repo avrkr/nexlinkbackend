@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Variable = require('../models/Variable');
 const { protect } = require('../middleware/auth');
 
@@ -31,10 +32,28 @@ router.post('/', protect, async (req, res) => {
     }
 });
 
-// @route   DELETE /api/variables/:key
-router.delete('/:key', protect, async (req, res) => {
+// @route   DELETE /api/variables/:idOrKey
+router.delete('/:idOrKey', protect, async (req, res) => {
     try {
-        const variable = await Variable.findOneAndDelete({ userId: req.user._id, key: req.params.key });
+        let variable;
+        const { idOrKey } = req.params;
+
+        // Try deleting by ID first if it looks like a MongoDB ID
+        if (idOrKey.match(/^[0-9a-fA-F]{24}$/)) {
+            variable = await Variable.findOneAndDelete({
+                userId: req.user._id,
+                _id: new mongoose.Types.ObjectId(idOrKey)
+            });
+        }
+
+        // If not found by ID (or not an ID), try deleting by Key
+        if (!variable) {
+            variable = await Variable.findOneAndDelete({
+                userId: req.user._id,
+                key: idOrKey
+            });
+        }
+
         if (!variable) return res.status(404).json({ message: 'Variable not found' });
         res.json({ message: 'Variable deleted' });
     } catch (err) {
